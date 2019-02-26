@@ -159,6 +159,18 @@ void print_bpf_insn(const struct bpf_insn_cbs *cbs,
 				bpf_ldst_string[BPF_SIZE(insn->code) >> 3],
 				insn->dst_reg, insn->off,
 				insn->src_reg);
+		else if (BPF_MODE(insn->code) == BPF_FADD)
+			verbose(cbs->private_data, "(%02x) lock "
+                                       "tmp = *(%s *)(r%d %+d) + r%d; "
+                                       "r%d = (%s *)(r%d %+d); "
+                                       "*(%s *)(r%d %+d) = tmp;\n",
+				insn->code,
+                /* tmp = *(u64 *)(dst_reg + off16) + src_reg */
+				bpf_ldst_string[BPF_SIZE(insn->code) >> 3], insn->dst_reg, insn->off, insn->src_reg,
+                /* src_reg = *(u64 *)(dst_reg + off16) */
+				insn->src_reg, bpf_ldst_string[BPF_SIZE(insn->code) >> 3], insn->dst_reg, insn->off,
+                /* *(u64 *)(dst_reg + off16) = tmp */
+				bpf_ldst_string[BPF_SIZE(insn->code) >> 3], insn->dst_reg, insn->off);
 		else
 			verbose(cbs->private_data, "BUG_%02x\n", insn->code);
 	} else if (class == BPF_ST) {

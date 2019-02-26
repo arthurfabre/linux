@@ -20,6 +20,7 @@
 /* ld/ldx fields */
 #define BPF_DW		0x18	/* double word (64-bit) */
 #define BPF_XADD	0xc0	/* exclusive add */
+#define BPF_FADD	0xd0	/* atomic fetch and add */
 
 /* alu/jmp fields */
 #define BPF_MOV		0xb0	/* mov reg to reg */

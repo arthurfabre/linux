@@ -1251,6 +1251,8 @@ EXPORT_SYMBOL_GPL(__bpf_call_base);
 	INSN_3(STX, MEM,  DW),			\
 	INSN_3(STX, XADD, W),			\
 	INSN_3(STX, XADD, DW),			\
+	INSN_3(STX, FADD, W),			\
+	INSN_3(STX, FADD, DW),			\
 	/*   Immediate based. */		\
 	INSN_3(ST, MEM, B),			\
 	INSN_3(ST, MEM, H),			\
@@ -1544,6 +1546,15 @@ out:
 		CONT;
 	STX_XADD_DW: /* lock xadd *(u64 *)(dst_reg + off16) += src_reg */
 		atomic64_add((u64) SRC, (atomic64_t *)(unsigned long)
+			     (DST + insn->off));
+		CONT;
+
+	STX_FADD_W: /* lock tmp = *(u32 *)(dst_reg + off16) + src_reg; src_reg = *(u32 *)(dst_reg + off16); *(u32 *)(dst_reg + off16) = tmp */
+		atomic_fetch_add((u32) SRC, (atomic_t *)(unsigned long)
+			   (DST + insn->off));
+		CONT;
+	STX_FADD_DW: /* lock tmp = *(u64 *)(dst_reg + off16) + src_reg; src_reg = *(u64 *)(dst_reg + off16); *(u64 *)(dst_reg + off16) = tmp */
+		atomic64_fetch_add((u64) SRC, (atomic64_t *)(unsigned long)
 			     (DST + insn->off));
 		CONT;
 
