@@ -2829,6 +2829,94 @@ static int check_mem_access(struct bpf_verifier_env *env, int insn_idx, u32 regn
 	return err;
 }
 
+/* Return true if it's OK to have the same insn return a different type. */
+static bool reg_type_mismatch_ok(enum bpf_reg_type type)
+{
+	switch (type) {
+	case PTR_TO_CTX:
+	case PTR_TO_SOCKET:
+	case PTR_TO_SOCKET_OR_NULL:
+	case PTR_TO_SOCK_COMMON:
+	case PTR_TO_SOCK_COMMON_OR_NULL:
+	case PTR_TO_TCP_SOCK:
+	case PTR_TO_TCP_SOCK_OR_NULL:
+		return false;
+	default:
+		return true;
+	}
+}
+
+/* If an instruction was previously used with particular pointer types, then we
+ * need to be careful to avoid cases such as the below, where it may be ok
+ * for one branch accessing the pointer, but not ok for the other branch:
+ *
+ * R1 = sock_ptr
+ * goto X;
+ * ...
+ * R1 = some_other_valid_ptr;
+ * goto X;
+ * ...
+ * R2 = *(u32 *)(R1 + 0);
+ */
+static bool reg_type_mismatch(enum bpf_reg_type src, enum bpf_reg_type prev)
+{
+	return src != prev && (!reg_type_mismatch_ok(src) ||
+			       !reg_type_mismatch_ok(prev));
+}
+
+// check_load checks if src_reg + insn.offset can be loaded into dst_reg
+static int check_load(struct bpf_verifier_env *env, int insn_idx, __u8 dst_reg, __u8 src_reg, struct bpf_insn *insn, bool strict_alignment_once)
+{
+    struct bpf_reg_state *regs;
+    enum bpf_reg_type *prev_src_type, src_reg_type;
+    int err;
+
+    regs = cur_regs(env);
+
+    /* check src operand */
+    err = check_reg_arg(env, src_reg, SRC_OP);
+    if (err)
+        return err;
+
+    err = check_reg_arg(env, dst_reg, DST_OP_NO_MARK);
+    if (err)
+        return err;
+
+    src_reg_type = regs[src_reg].type;
+
+    /* check that memory (src_reg + off) is readable,
+     * the state of dst_reg will be updated by this func
+     */
+    err = check_mem_access(env, env->insn_idx, src_reg,
+                   insn->off, BPF_SIZE(insn->code),
+                   BPF_READ, insn->dst_reg, strict_alignment_once);
+    if (err)
+        return err;
+
+    prev_src_type = &env->insn_aux_data[env->insn_idx].ptr_type;
+
+    if (*prev_src_type == NOT_INIT) {
+        /* saw a valid insn
+         * dst_reg = *(u32 *)(src_reg + off)
+         * save type to validate intersecting paths
+         */
+        *prev_src_type = src_reg_type;
+
+    } else if (reg_type_mismatch(src_reg_type, *prev_src_type)) {
+        /* ABuser program is trying to use the same insn
+         * dst_reg = *(u32*) (src_reg + off)
+         * with different pointer types:
+         * src_reg == ctx in one branch and
+         * src_reg == stack|map in some other branch.
+         * Reject it.
+         */
+        verbose(env, "same insn cannot be used with different pointers\n");
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
 static int check_xadd(struct bpf_verifier_env *env, int insn_idx, struct bpf_insn *insn)
 {
 	int err;
@@ -2896,6 +2984,19 @@ static int __check_stack_boundary(struct bpf_verifier_env *env, u32 regno,
 		return -EACCES;
 	}
 	return 0;
+}
+
+static int check_fadd(struct bpf_verifier_env *env, int insn_idx, struct bpf_insn *insn)
+{
+    int err;
+
+    /* check we can deref dst and add src to it */
+    err = check_xadd(env, insn_idx, insn);
+    if (err)
+        return err;
+
+    /* check we can load dst + offset into src */
+    return check_load(env, insn_idx, insn->src_reg, insn->dst_reg, insn, true);
 }
 
 /* when register 'regno' is passed into function that will read 'access_size'
@@ -7473,50 +7574,11 @@ static int do_check(struct bpf_verifier_env *env)
 				return err;
 
 		} else if (class == BPF_LDX) {
-			enum bpf_reg_type *prev_src_type, src_reg_type;
-
 			/* check for reserved fields is already done */
 
-			/* check src operand */
-			err = check_reg_arg(env, insn->src_reg, SRC_OP);
-			if (err)
-				return err;
-
-			err = check_reg_arg(env, insn->dst_reg, DST_OP_NO_MARK);
-			if (err)
-				return err;
-
-			src_reg_type = regs[insn->src_reg].type;
-
-			/* check that memory (src_reg + off) is readable,
-			 * the state of dst_reg will be updated by this func
-			 */
-			err = check_mem_access(env, env->insn_idx, insn->src_reg,
-					       insn->off, BPF_SIZE(insn->code),
-					       BPF_READ, insn->dst_reg, false);
-			if (err)
-				return err;
-
-			prev_src_type = &env->insn_aux_data[env->insn_idx].ptr_type;
-
-			if (*prev_src_type == NOT_INIT) {
-				/* saw a valid insn
-				 * dst_reg = *(u32 *)(src_reg + off)
-				 * save type to validate intersecting paths
-				 */
-				*prev_src_type = src_reg_type;
-
-			} else if (reg_type_mismatch(src_reg_type, *prev_src_type)) {
-				/* ABuser program is trying to use the same insn
-				 * dst_reg = *(u32*) (src_reg + off)
-				 * with different pointer types:
-				 * src_reg == ctx in one branch and
-				 * src_reg == stack|map in some other branch.
-				 * Reject it.
-				 */
-				verbose(env, "same insn cannot be used with different pointers\n");
-				return -EINVAL;
-			}
+            err = check_load(env, env->insn_idx, insn->dst_reg, insn->src_reg, insn, false);
+            if (err)
+                return err;
 
 		} else if (class == BPF_STX) {
 			enum bpf_reg_type *prev_dst_type, dst_reg_type;
@@ -7528,6 +7590,14 @@ static int do_check(struct bpf_verifier_env *env)
 				env->insn_idx++;
 				continue;
 			}
+
+            if (BPF_MODE(insn->code) == BPF_FADD) {
+                err = check_fadd(env, env->insn_idx, insn);
+                if (err)
+                    return err;
+                env->insn_idx++;
+                continue;
+            }
 
 			/* check src1 operand */
 			err = check_reg_arg(env, insn->src_reg, SRC_OP);
@@ -7803,7 +7873,8 @@ static int replace_map_fd_with_map_ptr(struct bpf_verifier_env *env)
 
 		if (BPF_CLASS(insn->code) == BPF_STX &&
 		    ((BPF_MODE(insn->code) != BPF_MEM &&
-		      BPF_MODE(insn->code) != BPF_XADD) || insn->imm != 0)) {
+		      (BPF_MODE(insn->code) != BPF_XADD &&
+               BPF_MODE(insn->code) != BPF_FADD)) || insn->imm != 0)) {
 			verbose(env, "BPF_STX uses reserved fields\n");
 			return -EINVAL;
 		}
