@@ -131,7 +131,7 @@ endif
 CLANG_SYS_INCLUDES := $(shell $(CLANG) -v -E - </dev/null 2>&1 \
 	| sed -n '/<...> search starts here:/,/End of search list./{ s| \(/.*\)|-idirafter \1|p }')
 
-CLANG_FLAGS = -I. -I./include/uapi -I../../../include/uapi \
+CLANG_FLAGS = -I. -I./include/uapi -I../../../include/uapi -I../../../../usr/include \
 	      $(CLANG_SYS_INCLUDES) \
 	      -Wno-compare-distinct-pointer-types
 
