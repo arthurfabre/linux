@@ -21,6 +21,7 @@ TARGETS += ir
 TARGETS += kcmp
 TARGETS += kexec
 TARGETS += kvm
+# TARGETS += kvm - fucked on ppc
 TARGETS += lib
 TARGETS += livepatch
 TARGETS += membarrier
