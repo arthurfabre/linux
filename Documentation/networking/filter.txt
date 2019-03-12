@@ -973,6 +973,7 @@ Mode modifier is one of:
   BPF_LEN  0x80  /* classic BPF only, reserved in eBPF */
   BPF_MSH  0xa0  /* classic BPF only, reserved in eBPF */
   BPF_XADD 0xc0  /* eBPF only, exclusive add */
+  BPF_FADD 0xe0  /* eBPF only, atomic fetch and add */
 
 eBPF has two non-generic instructions: (BPF_ABS | <size> | BPF_LD) and
 (BPF_IND | <size> | BPF_LD) which are used to access packet data.
