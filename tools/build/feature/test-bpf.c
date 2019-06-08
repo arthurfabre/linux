@@ -14,6 +14,8 @@
 #  define __NR_bpf 349
 # elif defined(__s390__)
 #  define __NR_bpf 351
+# elif defined(__powerpc__)
+#  define __NR_bpf 361
 # else
 #  error __NR_bpf not defined. libbpf does not support your arch.
 # endif
