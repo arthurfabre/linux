@@ -4,7 +4,7 @@ ARCH ?= $(shell echo $(uname_M) | sed -e s/x86_64/x86/)
 
 ifneq ($(ARCH),sparc64)
 nothing:
-.PHONY: all clean run_tests install emit_tests
+.PHONY: all clean run_tests install
 .SILENT:
 else
 
