@@ -77,9 +77,12 @@ static struct foo struct3 = {
 		bpf_map_update_elem(&result_##map, &key, var, 0);	\
 	} while (0)
 
+#endif
+
 SEC("static_data_load")
 int load_static_data(struct __sk_buff *skb)
 {
+    /*
 	static const __u64 bar = ~0;
 
 	test_reloc(number, 0, &num0);
@@ -108,7 +111,7 @@ int load_static_data(struct __sk_buff *skb)
 
 	test_reloc(number,  9, &struct0.c);
 	test_reloc(number, 10, &bar);
-
+    */
 	return TC_ACT_OK;
 }
 
