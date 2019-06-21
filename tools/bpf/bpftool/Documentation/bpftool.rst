@@ -19,7 +19,7 @@ SYNOPSIS
 	*OBJECT* := { **map** | **program** | **cgroup** | **perf** | **net** | **feature** }
 
 	*OPTIONS* := { { **-V** | **--version** } | { **-h** | **--help** }
-	| { **-j** | **--json** } [{ **-p** | **--pretty** }] }
+	| { **-j** | **--json** } [{ **-p** | **--pretty** }] | { **-e** | **--effective** } }
 
 	*MAP-COMMANDS* :=
 	{ **show** | **list** | **create** | **dump** | **update** | **lookup** | **getnext**
@@ -70,6 +70,10 @@ OPTIONS
 		  Print all logs available, even debug-level information. This
 		  includes logs from libbpf as well as from the verifier, when
 		  attempting to load programs.
+
+	-e, --effective
+		  Retrieve effective programs that will execute for events
+		  within a cgroup. This includes inherited along with attached ones.
 
 SEE ALSO
 ========

@@ -12,7 +12,8 @@ SYNOPSIS
 
 	**bpftool** [*OPTIONS*] **cgroup** *COMMAND*
 
-	*OPTIONS* := { { **-j** | **--json** } [{ **-p** | **--pretty** }] | { **-f** | **--bpffs** } }
+	*OPTIONS* := { { **-j** | **--json** } [{ **-p** | **--pretty** }] | { **-f** | **--bpffs** }
+	| { **-e** | **--effective** } }
 
 	*COMMANDS* :=
 	{ **show** | **list** | **tree** | **attach** | **detach** | **help** }
@@ -120,6 +121,11 @@ OPTIONS
 	-d, --debug
 		  Print all logs available from libbpf, including debug-level
 		  information.
+
+	-e, --effective
+		  Retrieve effective programs that will execute for events
+		  within a cgroup. This includes inherited along with attached
+		  ones.
 
 EXAMPLES
 ========

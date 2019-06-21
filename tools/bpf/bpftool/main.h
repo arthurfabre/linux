@@ -45,7 +45,7 @@
 	"PROG := { id PROG_ID | pinned FILE | tag PROG_TAG }"
 #define HELP_SPEC_OPTIONS						\
 	"OPTIONS := { {-j|--json} [{-p|--pretty}] | {-f|--bpffs} |\n"	\
-	"\t            {-m|--mapcompat} | {-n|--nomount} }"
+	"\t            {-m|--mapcompat} | {-n|--nomount} | {-e|--effective} }"
 #define HELP_SPEC_MAP							\
 	"MAP := { id MAP_ID | pinned FILE }"
 
@@ -92,6 +92,7 @@ extern bool json_output;
 extern bool show_pinned;
 extern bool block_mount;
 extern bool verifier_logs;
+extern unsigned int query_flags;
 extern int bpf_flags;
 extern struct pinned_obj_table prog_table;
 extern struct pinned_obj_table map_table;

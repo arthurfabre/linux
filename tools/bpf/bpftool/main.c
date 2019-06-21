@@ -27,6 +27,7 @@ bool json_output;
 bool show_pinned;
 bool block_mount;
 bool verifier_logs;
+unsigned int query_flags;
 int bpf_flags;
 struct pinned_obj_table prog_table;
 struct pinned_obj_table map_table;
@@ -327,6 +328,7 @@ int main(int argc, char **argv)
 		{ "mapcompat",	no_argument,	NULL,	'm' },
 		{ "nomount",	no_argument,	NULL,	'n' },
 		{ "debug",	no_argument,	NULL,	'd' },
+		{ "effective",	no_argument,	NULL,	'e' },
 		{ 0 }
 	};
 	int opt, ret;
@@ -342,7 +344,7 @@ int main(int argc, char **argv)
 	hash_init(map_table.table);
 
 	opterr = 0;
-	while ((opt = getopt_long(argc, argv, "Vhpjfmnd",
+	while ((opt = getopt_long(argc, argv, "Vhpjfmnde",
 				  options, NULL)) >= 0) {
 		switch (opt) {
 		case 'V':
@@ -375,6 +377,9 @@ int main(int argc, char **argv)
 		case 'd':
 			libbpf_set_print(print_all_levels);
 			verifier_logs = true;
+			break;
+		case 'e':
+			query_flags = BPF_F_QUERY_EFFECTIVE;
 			break;
 		default:
 			p_err("unrecognized option '%s'", argv[optind - 1]);
