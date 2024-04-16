@@ -4371,11 +4371,6 @@ static inline void skb_metadata_set(struct sk_buff *skb, u8 meta_len)
 	skb_shinfo(skb)->meta_len = meta_len;
 }
 
-static inline void skb_metadata_clear(struct sk_buff *skb)
-{
-	skb_metadata_set(skb, 0);
-}
-
 struct sk_buff *skb_clone_sk(struct sk_buff *skb);
 
 #ifdef CONFIG_NETWORK_PHY_TIMESTAMPING
