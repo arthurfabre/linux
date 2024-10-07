@@ -10,6 +10,7 @@
 #include <linux/filter.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h> /* skb_shared_info */
+#include <net/trait.h>
 
 /**
  * DOC: XDP RX-queue information
@@ -75,6 +76,7 @@ enum xdp_buff_flags {
 	XDP_FLAGS_FRAGS_PF_MEMALLOC	= BIT(1), /* xdp paged memory is under
 						   * pressure
 						   */
+	XDP_FLAGS_HAS_TRAITS = BIT(2), /* traits can be stored in headroom */
 };
 
 struct xdp_buff {
@@ -113,6 +115,43 @@ static __always_inline void xdp_buff_set_frag_pfmemalloc(struct xdp_buff *xdp)
 	xdp->flags |= XDP_FLAGS_FRAGS_PF_MEMALLOC;
 }
 
+// TODO - just moving this is horrible.
+// Maybe we should move all the helpers too?
+struct xdp_frame {
+	void *data;
+	u16 len;
+	u16 headroom;
+	u32 metasize; /* uses lower 8-bits */
+	/* Lifetime of xdp_rxq_info is limited to NAPI/enqueue time,
+	 * while mem info is valid on remote CPU.
+	 */
+	struct xdp_mem_info mem;
+	struct net_device *dev_rx; /* used by cpumap */
+	u32 frame_sz;
+	u32 flags; /* supported values defined in xdp_buff_flags */
+};
+
+static __always_inline void *xdp_traits(const struct xdp_buff *xdp)
+{
+	return xdp->data_hard_start + sizeof(struct xdp_frame);
+}
+
+static __always_inline size_t xdp_traits_max_size(const struct xdp_buff *xdp)
+{
+	void *data_start = xdp->data_meta;
+
+	// TODO - this checks xdp_data_meta_unsupported()
+	// Do we need to?
+	if (unlikely(xdp->data_meta > xdp->data))
+		data_start = xdp->data;
+
+	ptrdiff_t max_len = data_start - xdp_traits(xdp);
+	if (unlikely(max_len) < 0)
+		return 0;
+
+	return (size_t)max_len;
+}
+
 static __always_inline void
 xdp_init_buff(struct xdp_buff *xdp, u32 frame_sz, struct xdp_rxq_info *rxq)
 {
@@ -131,6 +170,9 @@ xdp_prepare_buff(struct xdp_buff *xdp, unsigned char *hard_start,
 	xdp->data = data;
 	xdp->data_end = data + data_len;
 	xdp->data_meta = meta_valid ? data : data + 1;
+
+	if (traits_init(xdp_traits(xdp), xdp_traits_max_size(xdp)) == 0)
+		xdp->flags |= XDP_FLAGS_HAS_TRAITS;
 }
 
 /* Reserve memory area at end-of data area.
@@ -162,20 +204,6 @@ static __always_inline unsigned int xdp_get_buff_len(struct xdp_buff *xdp)
 out:
 	return len;
 }
-
-struct xdp_frame {
-	void *data;
-	u16 len;
-	u16 headroom;
-	u32 metasize; /* uses lower 8-bits */
-	/* Lifetime of xdp_rxq_info is limited to NAPI/enqueue time,
-	 * while mem info is valid on remote CPU.
-	 */
-	struct xdp_mem_info mem;
-	struct net_device *dev_rx; /* used by cpumap */
-	u32 frame_sz;
-	u32 flags; /* supported values defined in xdp_buff_flags */
-};
 
 static __always_inline bool xdp_frame_has_frags(struct xdp_frame *frame)
 {
@@ -375,6 +403,13 @@ static inline bool xdp_metalen_invalid(unsigned long metalen)
 	BUILD_BUG_ON(!__builtin_constant_p(meta_max));
 
 	return !IS_ALIGNED(metalen, sizeof(u32)) || metalen > meta_max;
+}
+
+static __always_inline void *xdp_meta_hard_start(const struct xdp_buff *xdp)
+{
+	if (xdp->flags & XDP_FLAGS_HAS_TRAITS)
+		return xdp_traits(xdp) + traits_size(xdp_traits(xdp));
+	return xdp->data_hard_start + sizeof(struct xdp_frame);
 }
 
 struct xdp_attachment_info {
