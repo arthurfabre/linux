@@ -519,6 +519,10 @@ enum {
 	 * use frags only up until ubuf_info is released
 	 */
 	SKBFL_MANAGED_FRAG_REFS = BIT(4),
+
+	/* a trait store is using part of the headroom
+	 */
+	SKBFL_HAS_TRAITS = BIT(5),
 };
 
 #define SKBFL_ZEROCOPY_FRAG	(SKBFL_ZEROCOPY_ENABLE | SKBFL_SHARED_FRAG)
@@ -4418,8 +4422,10 @@ static inline bool skb_metadata_differs(const struct sk_buff *skb_a,
 	       true : __skb_metadata_differs(skb_a, skb_b, len_a);
 }
 
+// TODO - should we rename this to reflect it sets the traits flag too?
 static inline void skb_metadata_set(struct sk_buff *skb, u8 meta_len)
 {
+	skb_shinfo(skb)->flags |= SKBFL_HAS_TRAITS;
 	skb_shinfo(skb)->meta_len = meta_len;
 }
 
