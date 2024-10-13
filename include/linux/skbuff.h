@@ -39,6 +39,11 @@
 #include <net/dropreason-core.h>
 #include <net/netmem.h>
 
+// TODO - this breaks everything because it indirectly ends up including another
+// header that depends on skbuff.h.
+// But skbuff.h definitions aren't present yet, they come after!
+//#include <net/xdp.h>
+
 /**
  * DOC: skb checksums
  *
@@ -4432,6 +4437,12 @@ static inline void skb_metadata_set(struct sk_buff *skb, u8 meta_len)
 static inline void skb_metadata_clear(struct sk_buff *skb)
 {
 	skb_metadata_set(skb, 0);
+}
+
+static inline void *skb_traits(const struct sk_buff *skb)
+{
+	//return skb->head + sizeof(xdp_frame); // Broken because of the header mess!
+	return skb->head + 40;
 }
 
 struct sk_buff *skb_clone_sk(struct sk_buff *skb);

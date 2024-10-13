@@ -12059,6 +12059,38 @@ __bpf_kfunc int bpf_sk_assign_tcp_reqsk(struct __sk_buff *s, struct sock *sk,
 #endif
 }
 
+__bpf_kfunc int bpf_skb_trait_set(const struct sk_buff *skb, u64 key,
+				  const void *val, u64 val__sz, u64 flags)
+{
+	if (!skb_shinfo(skb)->flags & SKBFL_HAS_TRAITS)
+		return -ENOTSUPP;
+
+	// TODO - what is skb has been cloned? set() should probably error out?
+	// Or maybe it's ok for traits to always work across all clones?
+
+	return trait_set(skb_traits(skb), skb_metadata_end(skb)-skb_metadata_len(skb),
+			 key, val, val__sz, flags);
+}
+
+__bpf_kfunc int bpf_skb_trait_get(const struct sk_buff *skb, u64 key,
+				  void *val, u64 val__sz)
+{
+	if (!skb_shinfo(skb)->flags & SKBFL_HAS_TRAITS)
+		return -ENOTSUPP;
+
+	return trait_get(skb_traits(skb), key, val, val__sz);
+}
+
+__bpf_kfunc int bpf_skb_trait_del(const struct sk_buff *skb, u64 key)
+{
+	if (!skb_shinfo(skb)->flags & SKBFL_HAS_TRAITS)
+		return -ENOTSUPP;
+
+	// TODO - what is skb has been cloned?
+
+	return trait_del(skb_traits(skb), key);
+}
+
 __bpf_kfunc_end_defs();
 
 int bpf_dynptr_from_skb_rdonly(struct __sk_buff *skb, u64 flags,
@@ -12078,6 +12110,9 @@ int bpf_dynptr_from_skb_rdonly(struct __sk_buff *skb, u64 flags,
 
 BTF_KFUNCS_START(bpf_kfunc_check_set_skb)
 BTF_ID_FLAGS(func, bpf_dynptr_from_skb, KF_TRUSTED_ARGS)
+BTF_ID_FLAGS(func, bpf_skb_trait_set)
+BTF_ID_FLAGS(func, bpf_skb_trait_get)
+BTF_ID_FLAGS(func, bpf_skb_trait_del)
 BTF_KFUNCS_END(bpf_kfunc_check_set_skb)
 
 BTF_KFUNCS_START(bpf_kfunc_check_set_xdp)
