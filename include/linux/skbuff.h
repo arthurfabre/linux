@@ -1023,6 +1023,8 @@ struct sk_buff {
 	__u8			csum_not_inet:1;
 #endif
 	__u8			unreadable:1;
+	/* Trait store in headroom, offset by sizeof(struct xdp_frame) */
+	__u8			traits_after_xdp_frame:1;
 #if defined(CONFIG_NET_SCHED) || defined(CONFIG_NET_XGRESS)
 	__u16			tc_index;	/* traffic control index */
 #endif
