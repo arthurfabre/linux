@@ -18,12 +18,12 @@
  * TODO - should we support more sizes? Can switch to three bits per entry.
  * TODO - should we support a 0 size to just the presence / absence of key without a value?
  */
-static bool valid_len(u64 len)
+static __always_inline bool valid_len(u64 len)
 {
 	return len == 2 || len == 4 || len == 8;
 }
 
-static bool valid_key(u64 key)
+static __always_inline bool valid_key(u64 key)
 {
 	return key < 64;
 }
@@ -43,12 +43,12 @@ struct hdr {
 
 static_assert(sizeof(struct hdr) == __TRAITS_HDR_SIZE);
 
-static int total_length(struct hdr h)
+static __always_inline int total_length(struct hdr h)
 {
 	return (hweight64(h.high) << 2) + (hweight64(h.low) << 1);
 }
 
-static struct hdr and(struct hdr h, u64 mask)
+static __always_inline struct hdr and(struct hdr h, u64 mask)
 {
 	return (struct hdr){
 		h.high & mask,
@@ -56,7 +56,7 @@ static struct hdr and(struct hdr h, u64 mask)
 	};
 }
 
-static int offset(struct hdr h, u64 key)
+static __always_inline int offset(struct hdr h, u64 key)
 {
 	/* Calculate total length of previous keys by masking out keys after. */
 	return sizeof(struct hdr) + total_length(and(h, ~(~0llu << key)));
