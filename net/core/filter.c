@@ -85,6 +85,7 @@
 #include <linux/un.h>
 #include <net/xdp_sock_drv.h>
 #include <net/inet_dscp.h>
+#include <net/trait.h>
 
 #include "dev.h"
 
@@ -3926,9 +3927,8 @@ static unsigned long xdp_get_metalen(const struct xdp_buff *xdp)
 
 BPF_CALL_2(bpf_xdp_adjust_head, struct xdp_buff *, xdp, int, offset)
 {
-	void *xdp_frame_end = xdp->data_hard_start + sizeof(struct xdp_frame);
 	unsigned long metalen = xdp_get_metalen(xdp);
-	void *data_start = xdp_frame_end + metalen;
+	void *data_start = xdp_meta_hard_start(xdp) + metalen;
 	void *data = xdp->data + offset;
 
 	if (unlikely(data < data_start ||
@@ -4222,13 +4222,12 @@ static const struct bpf_func_proto bpf_xdp_adjust_tail_proto = {
 
 BPF_CALL_2(bpf_xdp_adjust_meta, struct xdp_buff *, xdp, int, offset)
 {
-	void *xdp_frame_end = xdp->data_hard_start + sizeof(struct xdp_frame);
 	void *meta = xdp->data_meta + offset;
 	unsigned long metalen = xdp->data - meta;
 
 	if (xdp_data_meta_unsupported(xdp))
 		return -ENOTSUPP;
-	if (unlikely(meta < xdp_frame_end ||
+	if (unlikely(meta < xdp_meta_hard_start(xdp) ||
 		     meta > xdp->data))
 		return -EINVAL;
 	if (unlikely(xdp_metalen_invalid(metalen)))
@@ -12047,6 +12046,36 @@ __bpf_kfunc int bpf_sk_assign_tcp_reqsk(struct __sk_buff *s, struct sock *sk,
 #endif
 }
 
+__bpf_kfunc int bpf_skb_trait_set(const struct sk_buff *skb, u64 key,
+				  const void *val, u64 val__sz, u64 flags)
+{
+	void *traits = skb_traits(skb);
+	if (traits == NULL)
+		return -EOPNOTSUPP;
+
+	return trait_set(traits, skb_metadata_end(skb) - skb_metadata_len(skb),
+			 key, val, val__sz, flags);
+}
+
+__bpf_kfunc int bpf_skb_trait_get(const struct sk_buff *skb, u64 key,
+				  void *val, u64 val__sz)
+{
+	void *traits = skb_traits(skb);
+	if (traits == NULL)
+		return -EOPNOTSUPP;
+
+	return trait_get(traits, key, val, val__sz);
+}
+
+__bpf_kfunc int bpf_skb_trait_del(const struct sk_buff *skb, u64 key)
+{
+	void *traits = skb_traits(skb);
+	if (traits == NULL)
+		return -EOPNOTSUPP;
+
+	return trait_del(traits, key);
+}
+
 __bpf_kfunc_end_defs();
 
 int bpf_dynptr_from_skb_rdonly(struct __sk_buff *skb, u64 flags,
@@ -12066,6 +12095,9 @@ int bpf_dynptr_from_skb_rdonly(struct __sk_buff *skb, u64 flags,
 
 BTF_KFUNCS_START(bpf_kfunc_check_set_skb)
 BTF_ID_FLAGS(func, bpf_dynptr_from_skb, KF_TRUSTED_ARGS)
+BTF_ID_FLAGS(func, bpf_skb_trait_set)
+BTF_ID_FLAGS(func, bpf_skb_trait_get)
+BTF_ID_FLAGS(func, bpf_skb_trait_del)
 BTF_KFUNCS_END(bpf_kfunc_check_set_skb)
 
 BTF_KFUNCS_START(bpf_kfunc_check_set_xdp)
