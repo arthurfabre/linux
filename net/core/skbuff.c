@@ -1515,6 +1515,18 @@ static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
 	atomic_inc(&(skb_shinfo(skb)->dataref));
 	skb->cloned = 1;
 
+	/* traits would end up shared with the clone,
+	 * and edits would be reflected there.
+	 * That's probably not expected.
+	 *
+	 * Maybe copy the traits and store them in an extension header
+	 * for clones?
+	 * This could also be used for egress packets.
+	 *
+	 * For now, pretend the clone doesn't have any traits.
+	 */
+	skb->traits_after_xdp_frame = false;
+
 	return n;
 #undef C
 }
