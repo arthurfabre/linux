@@ -39,6 +39,7 @@
 #include <net/net_debug.h>
 #include <net/dropreason-core.h>
 #include <net/netmem.h>
+#include <net/trait.h>
 
 /**
  * DOC: skb checksums
@@ -2831,6 +2832,14 @@ static inline void *pskb_pull(struct sk_buff *skb, unsigned int len)
 
 void skb_condense(struct sk_buff *skb);
 
+static inline void *skb_traits(const struct sk_buff *skb)
+{
+	if (skb->traits_after_xdp_frame)
+		return skb->head + _XDP_FRAME_SIZE;
+
+	return NULL;
+}
+
 /**
  *	skb_headroom - bytes at buffer head
  *	@skb: buffer to check
@@ -2839,7 +2848,13 @@ void skb_condense(struct sk_buff *skb);
  */
 static inline unsigned int skb_headroom(const struct sk_buff *skb)
 {
-	return skb->data - skb->head;
+	int trait_size = 0;
+	void *traits = skb_traits(skb);
+
+	if (traits)
+		trait_size = traits_size(traits);
+
+	return skb->data - skb->head - trait_size;
 }
 
 /**
